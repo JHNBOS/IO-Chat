@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width">
+
+    <title>IO Chat</title>
+
+    <!--Stylesheets-->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/site.css" rel="stylesheet">
+
+    <!--Scripts-->
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+
+        <!--Show title and tagline at the top-->
+        <div class="row">
+            <div class="col-sm-12 col-md-12 text-center">
+                <h2>IO Chat</h2>
+                <h4 style="color: dodgerblue;">The hottest place on the web</h4>
+            </div>
+        </div>
+
+        <hr style="border-color: #bdbdbd;"/>
+
+        <div class="row">
+            <!--Show the users that are online-->
+            <div class="col-sm-2 col-md-2" id="online-users">
+                <h3 ="users-title">Online Users</h3>
+                <ul id="users" class="list-group"></ul>
+            </div>
+
+            <!--Show the chat messages-->
+            <div class="col-sm-10 col-md-10">
+                <div id="chat-area" class="chat">
+                    <div id="otherUsers" class="col-sm-12 col-md-7"></div>
+                    <div id="currentUser" class="col-sm-12 col-md-5"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row" id="message-area">
+            <div class="col-sm-2 col-md-2"></div>
+            <div id="message-col" class="col-sm-12 col-md-8">
+                <div class="form-content">
+                    <form id="message-form">
+                        <div class="form-group">
+                            <textarea id="message" class="form-control" placeholder="Enter your message..."></textarea>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div id="button-col" class="col-sm-12 col-md-2">
+                <input id="sendButton" type="submit" class="btn btn-primary" value="Send" />
+            </div>
+        </div>
+
+        <!--Show modal to enter an username-->
+        <div class="modal" id="userModal">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                        <h5 class="modal-title">Welcome</h5>
+                    </div>
+                    <div class="modal-body">
+                        <form id="user-form">
+                            <div class="form-group">
+                                <label for="username">Please enter an username</label>
+                                <input id="username" class="form-control" placeholder="john"/>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="saveButton" type="button" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <h5>Made by Johan Bos</h5>
+        </footer>
+    </div>
+
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script>
+        $(document).ready(function(){
+
+            //Variables
+            var currentUsername = "";
+            var socket = io.connect();
+
+            var userlist = $("#users");
+
+            var userModal = $("#userModal");
+            var saveButton = $("#saveButton");
+            var userform = $("#userModal #user-form");
+            var username = $("#user-form #username");
+
+            var currentUser = $("#chat-area #currentUser");
+            var otherUsers = $("#chat-area #otherUsers");
+
+            var messagearea = $("#message-area");
+            var messageform = $("#message-area #message-form");
+            var message = $("#message-form #message");
+            var sendButton = $("#sendButton");
+
+            //-------------------------------------------------------------------------------------------//
+
+            //Show modal on start
+            userModal.modal("show");
+
+            //-------------------------------------------------------------------------------------------//
+
+            //Submit form when clicked on save button
+            saveButton.on("click", function(){
+                userform.submit();
+            });
+
+            //Perform when form is submitted
+            userform.submit(function(e){
+                e.preventDefault();
+                socket.emit("new", username.val(), function(data){
+                    if(data){
+                        userModal.modal("hide");
+                        messagearea.show();
+                    }
+                });
+
+                //Set username of current user
+                currentUsername = username.val();
+                console.log("currentUsername: " + currentUsername);
+
+                username.val("");
+            });
+
+            //-------------------------------------------------------------------------------------------//
+
+            //Get all online users
+            socket.on("get-users", function(data){
+                var html = "";
+
+                for(var i=0; i < data.length; i++){
+                    html += '<li class="list-group-item">' + data[i] + '</li>';
+                }
+
+                userlist.html(html);
+            });
+
+            //-------------------------------------------------------------------------------------------//
+
+            //Submit form when clicked on send button
+            sendButton.on("click", function(){
+                messageform.submit();
+            });
+
+            //Perform when form is submitted
+            messageform.submit(function(e){
+                e.preventDefault();
+                socket.emit("send", message.val());
+                message.val("");
+            });
+
+            //When new message is emitted
+            socket.on("New message", function(data){
+
+                //Decide where to put the message, left or right
+                if(data.user == currentUsername){
+                    currentUser.append('<div class="well" '
+                        + 'style="background-color: dodgerblue;color: white;">'
+                        + '<b>' + data.message + '<b>'
+                        + '<br />'
+                        + '<small style="float:right;">' + data.user + '</small>'
+                        + '</div>')
+
+                    if($(window).width() > 768){
+                        //Empty div to force next message down
+                        otherUsers.append('<div class="well" '
+                            + 'style="background-color: #ECECEC;border: none;">'
+                            + '<b><b>'
+                            + '<br />'
+                            + '<small style="float:right;"></small>'
+                            + '</div>');
+                    }
+                }
+                if(data.user != currentUsername){
+                    otherUsers.append('<div class="well" '
+                        + 'style="background-color: mediumspringgreen;color: white;">'
+                        + '<b>' + data.message + '<b>'
+                        + '<br />'
+                        + '<small style="float:right;">' + data.user + '</small>'
+                        + '</div>');
+
+                    if($(window).width() > 768){
+                        //Empty div to force next message down
+                        currentUser.append('<div class="well" '
+                            + 'style="background-color: #ECECEC;border: none;">'
+                            + '<b><b>'
+                            + '<br />'
+                            + '<small style="float:right;"></small>'
+                            + '</div>');
+                    }
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
